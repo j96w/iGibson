@@ -2,6 +2,8 @@ from igibson.robots.turtlebot_robot import Turtlebot
 from igibson.robots.husky_robot import Husky
 from igibson.robots.ant_robot import Ant
 from igibson.robots.humanoid_robot import Humanoid
+from igibson.robots.humanoid import Humanoid_hri
+from igibson.robots.camera import Camera
 from igibson.robots.jr2_robot import JR2
 from igibson.robots.jr2_kinova_robot import JR2_Kinova
 from igibson.robots.freight_robot import Freight
@@ -175,30 +177,38 @@ class BaseEnv(gym.Env):
                 scene._set_first_n_objects(first_n)
             self.simulator.import_ig_scene(scene)
 
-        if self.config['robot'] == 'Turtlebot':
-            robot = Turtlebot(self.config)
-        elif self.config['robot'] == 'Husky':
-            robot = Husky(self.config)
-        elif self.config['robot'] == 'Ant':
-            robot = Ant(self.config)
-        elif self.config['robot'] == 'Humanoid':
-            robot = Humanoid(self.config)
-        elif self.config['robot'] == 'JR2':
-            robot = JR2(self.config)
-        elif self.config['robot'] == 'JR2_Kinova':
-            robot = JR2_Kinova(self.config)
-        elif self.config['robot'] == 'Freight':
-            robot = Freight(self.config)
-        elif self.config['robot'] == 'Fetch':
-            robot = Fetch(self.config)
-        elif self.config['robot'] == 'Locobot':
-            robot = Locobot(self.config)
-        else:
-            raise Exception(
-                'unknown robot type: {}'.format(self.config['robot']))
+        self.robots = []
+
+        for i in range(len(self.config['robot'])):
+            if self.config['robot'][i] == 'Turtlebot':
+                robot = Turtlebot(self.config)
+            elif self.config['robot'][i] == 'Husky':
+                robot = Husky(self.config)
+            elif self.config['robot'][i] == 'Ant':
+                robot = Ant(self.config)
+            elif self.config['robot'][i] == 'Humanoid':
+                robot = Humanoid(self.config)
+            elif self.config['robot'][i] == 'Humanoid_hri':
+                robot = Humanoid_hri(self.config)
+            elif self.config['robot'][i] == 'JR2':
+                robot = JR2(self.config)
+            elif self.config['robot'][i] == 'JR2_Kinova':
+                robot = JR2_Kinova(self.config)
+            elif self.config['robot'][i] == 'Freight':
+                robot = Freight(self.config)
+            elif self.config['robot'][i] == 'Fetch':
+                robot = Fetch(self.config)
+            elif self.config['robot'][i] == 'Locobot':
+                robot = Locobot(self.config)
+            elif self.config['robot'][i] == 'Camera':
+                robot = Camera(self.config)
+            else:
+                raise Exception(
+                    'unknown robot type: {}'.format(self.config['robot'][i]))
+
+            self.robots.append(robot)
 
         self.scene = scene
-        self.robots = [robot]
         for robot in self.robots:
             self.simulator.import_robot(robot)
 

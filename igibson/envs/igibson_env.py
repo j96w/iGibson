@@ -32,7 +32,7 @@ class iGibsonEnv(BaseEnv):
         config_file,
         scene_id=None,
         mode='headless',
-        action_timestep=1 / 10.0,
+        action_timestep=1 / 60.0,
         physics_timestep=1 / 240.0,
         device_idx=0,
         render_to_tensor=False,
@@ -286,7 +286,7 @@ class iGibsonEnv(BaseEnv):
         info['episode_length'] = self.current_step
         info['collision_step'] = self.collision_step
 
-    def step(self, action):
+    def step(self, action, action2):
         """
         Apply robot's action.
         Returns the next state, reward, done and info,
@@ -301,18 +301,31 @@ class iGibsonEnv(BaseEnv):
         self.current_step += 1
         if action is not None:
             self.robots[0].apply_action(action)
-        collision_links = self.run_simulation()
-        self.collision_links = collision_links
-        self.collision_step += int(len(collision_links) > 0)
+        if action2 is not None:
+            self.robots[3].apply_action(action2)
+        self.run_simulation()
 
-        state = self.get_state(collision_links)
+
+        # collision_links = self.run_simulation()
+        # self.collision_links = collision_links
+        # self.collision_step += int(len(collision_links) > 0)
+
+        # state = self.get_state(collision_links)
+
+        # info = {}
+        # reward, info = self.task.get_reward(
+        #     self, collision_links, action, info)
+        # done, info = self.task.get_termination(
+        #     self, collision_links, action, info)
+
+        state = None
         info = {}
-        reward, info = self.task.get_reward(
-            self, collision_links, action, info)
-        done, info = self.task.get_termination(
-            self, collision_links, action, info)
-        self.task.step(self)
-        self.populate_info(info)
+        state = False
+        done = False
+        reward = 0.0
+
+        # self.task.step(self)
+        # self.populate_info(info)
 
         if done and self.automatic_reset:
             info['last_observation'] = state
