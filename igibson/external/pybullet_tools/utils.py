@@ -1,3 +1,7 @@
+"""
+Developed by Caelen Garrett in pybullet-planning repository (https://github.com/caelan/pybullet-planning)
+and adapted by iGibson team.
+"""
 from __future__ import print_function
 
 import colorsys
@@ -1157,6 +1161,24 @@ def all_between(lower_limits, values, upper_limits):
     return np.less_equal(lower_limits, values).all() and \
         np.less_equal(values, upper_limits).all()
 
+def get_child_frame_pose(parent_bid, parent_link, child_bid, child_link):
+    # TODO(mjlbach):Mostly shared with BRRobot, can be made a util
+
+    # Different pos/orn calculations for base/links
+    if child_link == -1:
+        body_pos, body_orn = p.getBasePositionAndOrientation(child_bid)
+    else:
+        body_pos, body_orn = p.getLinkState(child_bid, child_link)[:2]
+
+    # Get inverse world transform of body frame
+    inv_body_pos, inv_body_orn = p.invertTransform(body_pos, body_orn)
+    link_state = p.getLinkState(parent_bid, parent_link)
+    link_pos = link_state[0]
+    link_orn = link_state[1]
+    # B * T = P -> T = (B-1)P, where B is body transform, T is target transform and P is palm transform
+    child_frame_pos, child_frame_orn = p.multiplyTransforms(inv_body_pos, inv_body_orn, link_pos, link_orn)
+
+    return child_frame_pos, child_frame_orn
 #####################################
 
 # Bodies
@@ -1624,7 +1646,7 @@ def link_from_name(body, name):
     for link in get_joints(body):
         if get_link_name(body, link) == name:
             return link
-    raise ValueError(body, name)
+    raise ValueError("Could not find link %s for body %d" % (name, body))
 
 
 def has_link(body, name):
@@ -1633,6 +1655,15 @@ def has_link(body, name):
     except ValueError:
         return False
     return True
+
+
+def get_link_position_from_name(body_id, name):
+    try:
+        link_id = link_from_name(body_id, name)
+    except ValueError:
+        return None
+
+    return get_link_state(body_id, link_id).linkWorldPosition
 
 
 LinkState = namedtuple('LinkState', ['linkWorldPosition', 'linkWorldOrientation',
@@ -2552,6 +2583,30 @@ def approximate_as_cylinder(body, **kwargs):
 MAX_DISTANCE = 0.
 
 
+def set_all_collisions(body_id, enabled=1):
+    body_link_idxs = [-1] + [i for i in range(p.getNumJoints(body_id))]
+
+    for col_id in range(p.getNumBodies()):
+        col_link_idxs = [-1] + [i for i in range(p.getNumJoints(col_id))]
+        for body_link_idx in body_link_idxs:
+            for col_link_idx in col_link_idxs:
+                p.setCollisionFilterPair(body_id, col_id, body_link_idx, col_link_idx, enabled)
+
+def set_coll_filter(target_id, body_id, body_links, enable):
+    # TODO(mjlbach): mostly shared with behavior robot, can be factored out
+    """
+    Sets collision filters for body - to enable or disable them
+    :param target_id: physics body to enable/disable collisions with
+    :param body_id: physics body to enable/disable collisions from
+    :param body_id: physics links on body to enable/disable collisions from
+    :param enable: whether to enable/disable collisions
+    """
+    target_link_idxs = [-1] + [i for i in range(p.getNumJoints(target_id))]
+
+    for body_link_idx in body_links:
+        for target_link_idx in target_link_idxs:
+            p.setCollisionFilterPair(body_id, target_id, body_link_idx, target_link_idx, 1 if enable else 0)
+
 def contact_collision():
     step_simulation()
     return len(p.getContactPoints(physicsClientId=CLIENT)) != 0
@@ -2901,12 +2956,12 @@ def get_collision_fn(body, joints, obstacles, attachments, self_collisions, disa
             # Self-collisions should not have the max_distance parameter
             # , **kwargs):
             if pairwise_link_collision(body, link1, body, link2):
-                #print(get_body_name(body), get_link_name(body, link1), get_link_name(body, link2))
+                # print(get_body_name(body), get_link_name(body, link1), get_link_name(body, link2))
                 return True
         for body1, body2 in check_body_pairs:
             if pairwise_collision(body1, body2, **kwargs):
-                # print('body collision', body1, body2)
-                #print(get_body_name(body1), get_body_name(body2))
+                print('body collision', body1, body2)
+                # print(get_body_name(body1), get_body_name(body2))
                 return True
         return False
     return collision_fn
@@ -2943,10 +2998,10 @@ def plan_direct_joint_motion(body, joints, end_conf, **kwargs):
 
 def check_initial_end(start_conf, end_conf, collision_fn):
     if collision_fn(start_conf):
-        # print("Warning: initial configuration is in collision")
+        print("Warning: initial configuration is in collision")
         return False
     if collision_fn(end_conf):
-        # print("Warning: end configuration is in collision")
+        print("Warning: end configuration is in collision")
         return False
     return True
 
@@ -2954,7 +3009,6 @@ def check_initial_end(start_conf, end_conf, collision_fn):
 def plan_joint_motion(body, joints, end_conf, obstacles=[], attachments=[],
                       self_collisions=True, disabled_collisions=set(),
                       weights=None, resolutions=None, max_distance=MAX_DISTANCE, custom_limits={}, algorithm='birrt', allow_collision_links=[], **kwargs):
-
     assert len(joints) == len(end_conf)
     sample_fn = get_sample_fn(body, joints, custom_limits=custom_limits)
     distance_fn = get_distance_fn(body, joints, weights=weights)
@@ -2964,8 +3018,8 @@ def plan_joint_motion(body, joints, end_conf, obstacles=[], attachments=[],
 
     start_conf = get_joint_positions(body, joints)
 
-    if not check_initial_end(start_conf, end_conf, collision_fn):
-        return None
+    # if not check_initial_end(start_conf, end_conf, collision_fn):
+    #     return None
     if algorithm == 'direct':
         return direct_path(start_conf, end_conf, extend_fn, collision_fn)
     elif algorithm == 'birrt':
@@ -3208,6 +3262,10 @@ def plan_base_motion_2d(body, end_conf, base_limits, map_2d, occupancy_range, gr
         return None
 
     def collision_fn(q):
+        # just for my project
+
+        return False
+
         # TODO: update this function
         # set_base_values(body, q)
         # return any(pairwise_collision(body, obs, max_distance=max_distance) for obs in obstacles)
@@ -3371,6 +3429,38 @@ def get_constraints():
     """
     return [p.getConstraintUniqueId(i, physicsClientId=CLIENT)
             for i in range(p.getNumConstraints(physicsClientId=CLIENT))]
+
+def get_constraint_violation(cid):
+    (
+        parent_body,
+        parent_link,
+        child_body,
+        child_link,
+        _,
+        _,
+        joint_position_parent,
+        joint_position_child,
+    ) = p.getConstraintInfo(cid)[:8]
+
+    if parent_link == -1:
+        parent_link_pos, parent_link_orn = p.getBasePositionAndOrientation(parent_body)
+    else:
+        parent_link_pos, parent_link_orn = p.getLinkState(parent_body, parent_link)[:2]
+
+    if child_link == -1:
+        child_link_pos, child_link_orn = p.getBasePositionAndOrientation(child_body)
+    else:
+        child_link_pos, child_link_orn = p.getLinkState(child_body, child_link)[:2]
+
+    joint_pos_in_parent_world = p.multiplyTransforms(
+        parent_link_pos, parent_link_orn, joint_position_parent, [0, 0, 0, 1]
+    )[0]
+    joint_pos_in_child_world = p.multiplyTransforms(
+        child_link_pos, child_link_orn, joint_position_child, [0, 0, 0, 1]
+    )[0]
+
+    diff = np.linalg.norm(np.array(joint_pos_in_parent_world) - np.array(joint_pos_in_child_world))
+    return diff
 
 
 def add_p2p_constraint(body, body_link, robot, robot_link, max_force=None):

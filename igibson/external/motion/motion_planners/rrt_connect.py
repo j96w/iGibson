@@ -1,3 +1,7 @@
+"""
+Developed by Caelen Garrett in pybullet-planning repository (https://github.com/caelan/pybullet-planning)
+and adapted by iGibson team.
+"""
 from .smoothing import smooth_path
 from .rrt import TreeNode, configs
 from .utils import irange, argmin, RRT_ITERATIONS, RRT_RESTARTS, RRT_SMOOTHING
@@ -43,8 +47,8 @@ def rrt_connect(q1, q2, distance_fn, sample_fn, extend_fn, collision_fn, iterati
 # TODO: version which checks whether the segment is valid
 
 def direct_path(q1, q2, extend_fn, collision_fn):
-    if collision_fn(q1) or collision_fn(q2):
-        return None
+    # if collision_fn(q1) or collision_fn(q2):
+    #     return None
     path = [q1]
     for q in extend_fn(q1, q2):
         if collision_fn(q):
@@ -55,8 +59,8 @@ def direct_path(q1, q2, extend_fn, collision_fn):
 
 def birrt(q1, q2, distance, sample, extend, collision,
           restarts=RRT_RESTARTS, iterations=RRT_ITERATIONS, smooth=RRT_SMOOTHING):
-    if collision(q1) or collision(q2):
-        return None
+    # if collision(q1) or collision(q2):
+    #     return None
     path = direct_path(q1, q2, extend, collision)
     if path is not None:
         return path

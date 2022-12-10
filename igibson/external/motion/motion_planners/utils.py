@@ -1,10 +1,14 @@
+"""
+Developed by Caelen Garrett in pybullet-planning repository (https://github.com/caelan/pybullet-planning)
+and adapted by iGibson team.
+"""
 from random import shuffle
 from itertools import islice
 import time
 
 INF = float('inf')
 
-RRT_ITERATIONS = 20
+RRT_ITERATIONS = 40
 RRT_RESTARTS = 2
 RRT_SMOOTHING = 20
 
